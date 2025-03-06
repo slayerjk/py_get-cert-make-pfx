@@ -1,0 +1,5 @@
+{
+  "pki-url": "https://<PKI SERVER URL>",
+  "pki-user": "<PKI USER>",
+  "pki-pass": "<PKI USER'S PASS>"
+}
