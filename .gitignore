@@ -1,0 +1,17 @@
+# ignore all
+*
+
+# except
+!app_scripts/app_functions.py
+!app_scripts/project_mailing.py
+!app_scripts/project_helper.py
+
+!data_files/mailing_data_BLANK.json
+!data_files/data-prod_BLANK.json
+
+!app.py
+!project_static.py
+
+!.gitignore
+!README.md
+!requirements.txt
