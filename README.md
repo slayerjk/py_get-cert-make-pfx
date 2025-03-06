@@ -12,3 +12,5 @@ Just a small script to automatize PKI cert releasing.
     - CNAME2
 - Takes all csr and get via Playwright .crt file and put it in the CNAME dir with CNAME.crt.
 - Then it make .pfx file
+
+Rename data files(remove '_BLANK') in data_files.
