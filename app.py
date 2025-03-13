@@ -19,18 +19,19 @@ from project_static import (
     pki_pass,
     script_data,
     results_dir,
-    csr_dir,
     template,
     cer_ext,
     pfx_pass,
-    openssl_bin
+    openssl_bin,
+    cns_data,
 )
 
 from app_scripts.project_helper import files_rotate, check_create_dir, func_decor, check_file
 
 from app_scripts.app_functions import (
     create_cert,
-    make_pfx
+    make_pfx,
+    make_csr
 )
 
 # MAILING IMPORTS(IF YOU NEED)
@@ -59,9 +60,8 @@ func_decor(f'checking {data_files} dir exists and create if not')(check_create_d
 
 # CHECKING DATA DIRS & FILES
 func_decor(f'checking {script_data} file exist', 'crit')(check_file)(script_data)
+func_decor(f'checking {script_data} file exist', 'crit')(check_file)(cns_data)
 func_decor(f'checking {results_dir} dir exist/create', 'crit')(check_create_dir)(results_dir)
-func_decor(f'checking {csr_dir} dir exist/create', 'crit')(check_create_dir)(csr_dir)
-
 
 # CHECK MAILING DATA EXIST(IF YOU NEED MAILING)
 # func_decor(f'checking {mailing_data} exists', 'crit')(check_file)(mailing_data)
@@ -72,20 +72,39 @@ OTHER CODE GOES HERE
 user_report.write(f'{appname}: {str(start_date_n_time)}\n')
 user_report.write('----------------------------\n')
 
-# ITERATING OVER CSR DIRS
-# getting cn_name(dir's name inside CSR DIRS) and it's path
+# report lists
 total_cn_to_process = []
 failed_cn_to_process = []
 successfully_processed = []
 pfx_failed = []
-for csr_dir_path in os.scandir(csr_dir):
-    csr_file_path = ""
-    key_file_path = ""
-    cer_file_path = ""
+csr_file_path = ""
+key_file_path = ""
+cer_file_path = ""
 
-    cn_name = os.path.basename(csr_dir_path)
-    cn_path = csr_dir_path.path
-    total_cn_to_process.append(cn_name)
+# GET CNS_LIST
+with open(cns_data, 'r') as file:
+    cns_list = [i.strip() for i in file.readlines()]
+
+# CREATING DIRS FOR CNS IN CNS_LIST AND MAKING CSR AND KEYS
+for cn in cns_list:
+    # making separate dir for cn
+    cn_path = f'{results_dir}/{cn}'
+    try:
+        os.mkdir(cn_path)
+    except FileExistsError:
+        logging.info(f'{cn_path} alreade exists, moving on')
+    except Exception as e:
+        logging.warning(f'failed to create dir {cn_path}:\n\t{e}')
+        continue
+
+    # creating csr & key
+    try:
+        make_csr(openssl_bin, cn, cn_path, cn_path)
+    except Exception as e:
+        logging.warning(f'failed to make csr&key for {cn}:\n\t{e}\nskipping this cn')
+        continue
+    logging.info(f'Finished to make csr & key files for {cn}')
+
     # getting csr file path inside csr dir
     for file in glob.iglob(f'{cn_path}/*.csr'):
         csr_file_path = file
@@ -94,50 +113,45 @@ for csr_dir_path in os.scandir(csr_dir):
     for file in glob.iglob(f'{cn_path}/*.key'):
         key_file_path = file
         break
-    # skip this cn if there is no csr or key found
-    if not csr_file_path or not key_file_path:
-        logging.warning(f"no CSR or KEY file found in {cn_path}, skipping")
-        failed_cn_to_process.append(cn_name)
-        continue
 
     # CREATING CERTS
-    logging.info(f'STARTED: creating certs for {cn_name}\n')
     downloaded_certs_pathes = []
     with sync_playwright() as playwright:
         try:
-            cert_path = create_cert(
+            create_cert(
                 pki_url,
                 pki_user,
                 pki_pass,
                 csr_file_path,
                 template,
-                cn_name,
+                cn,
                 cer_ext,
                 cn_path,
                 playwright
             )
         except Exception as e:
-            logging.warning(f'FAILED: creating cert for {cn_name}, \n{e}, \nskipping\n')
+            logging.warning(f'FAILED: creating cert for {cn}, \n{e}, \nskipping\n')
         else:
-            successfully_processed.append(cn_name)
-            logging.info(f'DONE: creating cert for {cn_name}\n')
+            successfully_processed.append(cn)
+            logging.info(f'DONE: creating cert for {cn}\n')
 
-    # getting key file path inside csr dir
-    for file in glob.iglob(f'{cn_path}/*.crt'):
+    # getting certificate file path inside csr dir
+    for file in glob.iglob(f'{cn_path}/*.{cer_ext}'):
         cer_file_path = file
         break
     if not cer_file_path:
         logging.warning(f"no CRT file found in {cn_path}, skipping")
-        failed_cn_to_process.append(cn_name)
+        failed_cn_to_process.append(cn)
         continue
 
-    # making pfx
+    # making pfx (Windows ver of OpenSSL generate NOT VALID pfx to use for MACOS!!!)
     try:
-        make_pfx(openssl_bin, cn_name, cer_file_path, key_file_path, cn_path, pfx_pass)
+        make_pfx(openssl_bin, cn, cer_file_path, key_file_path, cn_path, pfx_pass)
     except Exception as e:
-        logging.warning(f'FAILED: to create PFX file for {cn_name}, \n{e}, skipping')
-        pfx_failed.append(cn_name)
+        logging.warning(f'FAILED: to create PFX file for {cn}, \n{e}, skipping')
+        pfx_failed.append(cn)
         continue
+    logging.info(f'DONE: create PFX file for {cn}')
 
 # report
 if len(failed_cn_to_process) > 0:
@@ -146,7 +160,6 @@ if len(successfully_processed) == len(total_cn_to_process):
     logging.info('all CNs processed successfully!')
 if len(pfx_failed) > 0:
     logging.warning(f'failures for PFX: {pfx_failed}')
-# logging.info(f'processed CNs:\n{successfully_processed}')
 
 # SENDING FINAL USER REPORT
 user_report.seek(0)
