@@ -3,14 +3,11 @@ Get cert from MS PKI server and make .pfx file
 
 Just a small script to automatize PKI cert releasing.
 
-**Workflow**
-- You must have a dir with .csr and .key files this format:
-  BASE_DIR
-    -CNANME1
-      - CNAME1.csr
-      - CNAME1.key
-    - CNAME2
-- Takes all csr and get via Playwright .crt file and put it in the CNAME dir with CNAME.crt.
-- Then it make .pfx file
+!To run in Linux only, where openSSL is in /usr/bin/openssl.!
 
-Rename data files(remove '_BLANK') in data_files.
+**Workflow**
+- Create RESULTS_<date> dir
+- Create inside results <CN> named dir based on <CN> in data_files/cns_data
+- Make <CN>.CSR & <CN>.KEY files using openSSL in each <CN>
+- Make <CN>.CER file in <CN> dir using Playwright and Windows PKI server(check creds & urls in data_files/data-prod.json)
+- Make <CN>.PFX file using openSSL with '123' pass
