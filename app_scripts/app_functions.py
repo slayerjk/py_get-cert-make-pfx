@@ -1,6 +1,67 @@
+import os.path
 import re
 from playwright.sync_api import Playwright, expect
 import subprocess
+
+
+# CREATING CSR
+def make_csr(
+        openssl_bin_path: str,
+        cn: str,
+        csr_path: str,
+        key_path: str,
+):
+    """
+    Make CSR and KEY file based on CN.
+    Must be run as SUDO, because of openSSL requirements!
+
+    :param openssl_bin_path: openssl bin path, str
+    :param cn: CN(common name) used for file names and opennssl subject, str
+    :param csr_path: path to save CSR, str
+    :param key_path: path to save KEY, str
+    :return:
+
+    Openssl command example:
+        # /usr/bin/openssl req -new -sha512 -nodes
+            -out "$CN_DIR"/"$CN".csr -newkey rsa:2048
+            -keyout "$CN_DIR"/"$CN".key
+            -subj "/CN=$CN"
+    """
+    csr_file_path = csr_path + "/" + cn + ".csr"
+    key_file_path = key_path + "/" + cn + ".key"
+    subject = f'/CN={cn}'
+    process_str = (f'{openssl_bin_path} req -new -sha512 -nodes '
+                   f'-out {csr_file_path} -newkey rsa:2048 '
+                   f'-keyout {key_file_path} -subj {subject}')
+    try:
+        subprocess.run(
+            [
+                openssl_bin_path,
+                "req",
+                "-new",
+                "-sha512",
+                "-nodes",
+                "-out",
+                csr_file_path,
+                "-newkey",
+                "rsa:2048",
+                "-keyout",
+                key_file_path,
+                "-subj",
+                subject
+            ], capture_output=True, text=True).stdout
+    except Exception as e:
+        raise Exception(f'FAILED TO MAKE CSR/KEY FOR {cn}\n'
+                        f'KEY:{key_file_path}\n'
+                        f'CSR:{csr_file_path}\n'
+                        f'PS_STR:\n{process_str}\n'
+                        f'{e}')
+
+    if not os.path.isfile(key_file_path):
+        raise Exception(f'Failed to make KEY file for {cn}:\n\t{process_str}')
+
+    if not os.path.isfile(csr_file_path):
+        raise Exception(f'Failed to make CSR file for {cn}:\n\t{process_str}')
 
 
 # CREATING CERT FILE
@@ -14,7 +75,7 @@ def create_cert(
         cer_ext: str,
         path_to_save_cer: str,
         playwright: Playwright
-) -> str:
+):
     """
     (CA server, Playwright)Create certificate via MS CA server
 
@@ -104,10 +165,6 @@ def create_cert(
         page.close()
         # context.close()
 
-    # sleep(1000)
-
-    return download_path
-
 
 # MAKE PFX FROM CERT & KEY
 def make_pfx(openssl_bin_path: str, cn: str, cer_file_path: str, key_file_path: str, out_file_path: str, pfx_pass: str):
@@ -129,7 +186,10 @@ def make_pfx(openssl_bin_path: str, cn: str, cer_file_path: str, key_file_path: 
                 capture_output=True, text=True).stdout
     """
     pfx_file_path = out_file_path+"/"+cn+".pfx"
-    process_str = f'{openssl_bin_path} pkcs12 -inkey {key_file_path} -in {cer_file_path} -export -out {pfx_file_path} -password pass:{pfx_pass}'
+    process_str = (f'{openssl_bin_path} pkcs12 '
+                   f'-inkey {key_file_path} '
+                   f'-in {cer_file_path} -export '
+                   f'-out {pfx_file_path} -password pass:{pfx_pass}')
     try:
         subprocess.run(
             [
