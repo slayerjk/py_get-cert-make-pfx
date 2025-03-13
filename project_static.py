@@ -12,7 +12,7 @@ from os import path, mkdir
 # COMMON DATA
 
 # SCRIPT APPNAME(FOR SEND MAIL FUNCTION, LOGNAME, ETC)
-appname = 'PKI-Auto'
+appname = 'PKI-Auto-wo-hd'
 
 # SCRIPT DATA DIR
 '''
@@ -77,8 +77,7 @@ with open(mailing_data, encoding='utf-8') as file:
     mail_list_users = data['list_users']
 
 # VA PROJECT REGARDING DATA
-csr_dir = f'{script_dir}/CSR'
-results_dir = f'{script_dir}/results_{start_date}'
+results_dir = f'{script_dir}/RESULTS_{start_date}'
 
 # template for PKI to use
 template = 'Web client and server'
@@ -87,7 +86,8 @@ template = 'Web client and server'
 pfx_pass = '123'
 
 # OpenSSL binary path
-openssl_bin = r'C:\Program Files\OpenSSL-Win64\bin\openssl.exe'
+# openssl_bin = r'C:\Program Files\OpenSSL-Win64\bin\openssl.exe'
+openssl_bin = r'/usr/bin/openssl'
 
 # certificate extension
 cer_ext = 'crt'
@@ -97,6 +97,7 @@ cer_ext = 'crt'
 
 # PROD
 script_data = f'{data_files}/data-prod.json'
+cns_data = f'{data_files}/cns_data'
 
 with open(script_data, encoding='utf-8') as file:
     data = json.load(file)
